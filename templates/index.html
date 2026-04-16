@@ -43,6 +43,21 @@
             opacity: 0.9;
         }
 
+        .user-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin: 10px 0 20px 0;
+        }
+        .user-actions {
+            display: flex;
+            gap: 10px;
+        }
+
         .controls {
             background: white;
             padding: 25px;
@@ -135,6 +150,26 @@
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             overflow: hidden;
+        }
+        .pagination {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: white;
+            border-top: 1px solid #eee;
+        }
+        .pagination .info {
+            color: #666;
+            font-size: 0.95em;
+        }
+        .pagination .controls {
+            display: flex;
+            gap: 10px;
+        }
+        .btn[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .table-header {
@@ -231,6 +266,66 @@
             margin-bottom: 30px;
         }
 
+        .cover-thumb {
+            width: 50px;
+            height: 75px;
+            object-fit: cover;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border: 1px solid #ddd;
+        }
+        .cover-thumb:hover {
+            transform: scale(1.5);
+            z-index: 10;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1000; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.85); 
+            justify-content: center;
+            align-items: center;
+            animation: fadeIn 0.3s;
+        }
+        
+        @keyframes fadeIn {
+            from {opacity: 0} 
+            to {opacity: 1}
+        }
+
+        .modal-content {
+            max-width: 90%;
+            max-height: 90vh;
+            border-radius: 5px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            object-fit: contain;
+        }
+
+        .close-modal {
+            position: absolute;
+            top: 20px;
+            right: 35px;
+            color: #f1f1f1;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 1001;
+        }
+        
+        .close-modal:hover {
+            color: #bbb;
+        }
+
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -268,6 +363,18 @@
             <p>诸位爱卿平礼</p>
         </div>
 
+        <!-- 用户信息与账号操作 -->
+        <div class="user-bar">
+            <div>
+                当前用户：<strong>{{ username or nickname }}</strong>
+                （{{ gender }}）
+            </div>
+            <div class="user-actions">
+              <!-- <a class="btn btn-small" href="/logout">退出登录</a> -->
+                <a class="btn btn-small btn-warning" href="/logout">切换账号</a>
+            </div>
+        </div>
+
         <!-- 消息提示区域 -->
         <div id="messageArea"></div>
 
@@ -279,7 +386,6 @@
                     <label for="searchType">搜索类型</label>
                     <select id="searchType">
                         <option value="all">全文搜索</option>
-                        <option value="id">按ID搜索</option>
                         <option value="title">按书名搜索</option>
                         <option value="author">按作者搜索</option>
                         <option value="isbn">按ISBN搜索</option>
@@ -309,11 +415,11 @@
                 <input type="hidden" id="bookId" value="">
                 <div class="form-row">
                     <div class="form-group">
-                        <label for="title">书名 *</label>
+                        <label for="title">书名</label>
                         <input type="text" id="title" name="title" required>
                     </div>
                     <div class="form-group">
-                        <label for="author">作者 *</label>
+                        <label for="author">作者</label>
                         <input type="text" id="author" name="author" required>
                     </div>
                     <div class="form-group">
@@ -329,6 +435,16 @@
                     <div class="form-group">
                         <label for="type">图书类型</label>
                         <input type="text" id="type" name="type" placeholder="如：小说、科技、历史等">
+                    </div>
+                    <div class="form-group">
+                        <label for="cover">封面</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="cover" name="cover" placeholder="输入图片URL" style="flex: 1;">
+                            <input type="file" id="coverFile" accept="image/*" style="display: none;" onchange="uploadCoverFile()">
+                            <button type="button" class="btn btn-info btn-small" onclick="document.getElementById('coverFile').click()">
+                                📤 上传
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div style="margin-top: 20px;">
@@ -356,6 +472,13 @@
                     <p>正在加载图书数据...</p>
                 </div>
             </div>
+            <div id="paginationBar" class="pagination" style="display:none;">
+                <div class="info" id="paginationInfo">第 1 / 1 页（共 0 条）</div>
+                <div class="controls">
+                    <button class="btn btn-small" id="prevBtn" onclick="goPrevPage()">⬅️ 上一页</button>
+                    <button class="btn btn-small" id="nextBtn" onclick="goNextPage()">下一页 ➡️</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -365,6 +488,9 @@
         let currentEditId = null;
         let isSearchMode = false;
         let currentSearchResult = null;
+        let currentPage = 1;
+        let pageSize = 20;
+        let totalPages = 1;
 
         // 页面加载完成后初始化
         document.addEventListener('DOMContentLoaded', function() {
@@ -440,6 +566,7 @@
             document.getElementById('searchValue').value = '';
             document.getElementById('searchType').value = 'all';
             updateSearchInfo(null);
+            currentPage = 1;
             loadBooks();
             showMessage('已显示全部图书', 'success');
         }
@@ -482,13 +609,20 @@
         // 加载所有图书数据
         async function loadBooks() {
             try {
-                const response = await fetch('/api/books');
+                const response = await fetch(`/api/books?page=${currentPage}`);
                 if (!response.ok) {
                     throw new Error('获取图书数据失败');
                 }
                 
-                const books = await response.json();
+                const result = await response.json();
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+                const books = result.books || [];
                 displayBooks(books);
+                if (!isSearchMode) {
+                    renderPagination(result.page || 1, result.total_pages || 1, result.total || books.length);
+                }
                 
                 // 如果不是搜索模式，清除搜索信息
                 if (!isSearchMode) {
@@ -499,6 +633,7 @@
                 showMessage('加载图书数据失败: ' + error.message, 'error');
                 document.getElementById('tableContainer').innerHTML = 
                     '<div class="empty-state"><h3>加载失败</h3><p>请检查网络连接或刷新页面重试</p></div>';
+                document.getElementById('paginationBar').style.display = 'none';
             }
         }
 
@@ -518,7 +653,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th>ID</th>
+                            <th style="width: 80px;">封面</th>
                             <th>书名</th>
                             <th>作者</th>
                             <th>ISBN</th>
@@ -530,7 +665,12 @@
                     <tbody>
                         ${books.map(book => `
                             <tr>
-                                <td>${book.id}</td>
+                                <td>
+                                    ${book.cover ? 
+                                        `<img src="${book.cover}" class="cover-thumb" onclick="showCover('${book.cover}')" alt="封面" title="点击查看大图">` : 
+                                        '<span style="color:#ccc; font-size: 0.8em;">无封面</span>'
+                                    }
+                                </td>
                                 <td>${book.title || 'N/A'}</td>
                                 <td>${book.author || 'N/A'}</td>
                                 <td>${book.isbn || 'N/A'}</td>
@@ -553,6 +693,33 @@
             `;
             
             container.innerHTML = tableHTML;
+            // 搜索模式隐藏分页
+            document.getElementById('paginationBar').style.display = isSearchMode ? 'none' : 'flex';
+        }
+
+        // 渲染分页
+        function renderPagination(page, totalPageCount, total) {
+            currentPage = page;
+            totalPages = totalPageCount;
+            const info = document.getElementById('paginationInfo');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            info.textContent = `第 ${page} / ${totalPageCount} 页（共 ${total} 条）`;
+            prevBtn.disabled = page <= 1;
+            nextBtn.disabled = page >= totalPageCount;
+            document.getElementById('paginationBar').style.display = 'flex';
+        }
+        function goPrevPage() {
+            if (currentPage > 1) {
+                currentPage -= 1;
+                loadBooks();
+            }
+        }
+        function goNextPage() {
+            if (currentPage < totalPages) {
+                currentPage += 1;
+                loadBooks();
+            }
         }
 
         // 添加新图书
@@ -610,6 +777,7 @@
                 document.getElementById('isbn').value = book.isbn || '';
                 document.getElementById('year').value = book.year || '';
                 document.getElementById('type').value = book.type || '';
+                document.getElementById('cover').value = book.cover || '';
                 
                 // 切换到编辑模式
                 isEditMode = true;
@@ -708,8 +876,41 @@
                 author: document.getElementById('author').value.trim(),
                 isbn: document.getElementById('isbn').value.trim() || null,
                 year: document.getElementById('year').value || null,
-                type: document.getElementById('type').value.trim() || null
+                type: document.getElementById('type').value.trim() || null,
+                cover: document.getElementById('cover').value.trim() || null
             };
+        }
+
+        // 上传封面文件
+        async function uploadCoverFile() {
+            const fileInput = document.getElementById('coverFile');
+            const file = fileInput.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            try {
+                showMessage('正在上传封面...', 'success');
+                const response = await fetch('/upload_cover', {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('cover').value = result.url;
+                    showMessage('封面上传成功', 'success');
+                } else {
+                    showMessage('上传失败: ' + result.error, 'error');
+                }
+            } catch (error) {
+                console.error('上传出错:', error);
+                showMessage('上传出错: ' + error.message, 'error');
+            }
+            
+            // 清空文件选择，以便下次可以选择同一文件
+            fileInput.value = '';
         }
 
         // 清空表单
@@ -717,6 +918,33 @@
             document.getElementById('bookForm').reset();
             document.getElementById('bookId').value = '';
         }
+
+        // 显示封面大图
+        function showCover(url) {
+            const modal = document.getElementById('imageModal');
+            const modalImg = document.getElementById('modalImage');
+            modal.style.display = "flex";
+            modalImg.src = url;
+        }
+
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('imageModal').style.display = "none";
+        }
+        
+        // 点击模态框背景关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('imageModal');
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
     </script>
+
+    <!-- 图片查看模态框 -->
+    <div id="imageModal" class="modal">
+        <span class="close-modal" onclick="closeModal()">&times;</span>
+        <img class="modal-content" id="modalImage">
+    </div>
 </body>
 </html>

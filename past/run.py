@@ -9,7 +9,7 @@
 """
 import os
 import sys
-from library_html import app, initialize_database
+from library_3 import app, initialize_database
 def main():
     print("正在初始化数据库...")
     if initialize_database():
